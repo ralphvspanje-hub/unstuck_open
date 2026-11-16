@@ -52,7 +52,7 @@ const HTML_FIGURE = `<div class="f"><style>
 <div class="col k"><div class="n"></div><div class="n"></div><div class="n"></div><div class="lab">hidden layers</div></div>
 <div class="col o"><div class="n"></div><div class="n"></div><div class="n"></div><div class="lab">brightest = guess</div></div></div>`;
 
-function answer(r: ExplainRequest): string {
+export function answer(r: ExplainRequest): string {
   const text =
     r.mode === "simpler"
       ? "Think of it as a fine for being cocky. Guess wrong while acting very sure, and the fine is huge. Guess right, and you pay almost nothing."
@@ -89,7 +89,7 @@ export const recap = (r: RecapRequest, signal: AbortSignal) => {
 };
 
 /** A real, working simulation, so "▶ Play with it" can be tried without the model. */
-const SIM = `<!doctype html><html><head><meta charset="utf-8"><style>
+export const SIM = `<!doctype html><html><head><meta charset="utf-8"><style>
 html,body{margin:0;height:100%;background:#16181d;color:#f4f4f5;font:14px system-ui;overflow:hidden}
 #top{position:absolute;left:18px;right:18px;top:12px;font-size:15px}
 #ctl{position:absolute;left:18px;bottom:14px;display:flex;gap:22px;align-items:center}

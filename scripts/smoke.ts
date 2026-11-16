@@ -7,6 +7,7 @@ import { chromium, type Page } from "playwright";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { FAKE_KEY, startFakeProvider } from "./fake-provider.ts";
 
 const VIDEO = process.argv[2] || "aircAruvnKk"; // 3Blue1Brown, "But what is a neural network?"
 const AT = Number(process.env.AT || 90); // where to start watching, in seconds
@@ -104,7 +105,38 @@ try {
     process.exit(0);
   }
 
+  // PROVIDER=openai|anthropic|reasoning: another provider (ADR 0009), set up on the setup page the way a
+  // Viewer would, against a fake one on this machine; the rest of the run then goes through it.
+  let fake: Awaited<ReturnType<typeof startFakeProvider>> | null = null;
+  if (process.env.PROVIDER) {
+    fake = await startFakeProvider();
+    const anthropic = process.env.PROVIDER === "anthropic";
+    const setup = await ctx.newPage();
+    await setup.goto(`chrome-extension://${sw.url().split("/")[2]}/setup.html`);
+    const settle = async () => {
+      await setup.waitForFunction(() => !/Trying|Asking|Checking/.test(document.querySelector("#key-status")?.textContent ?? ""), null, { timeout: 30_000 });
+      return setup.locator("#key-status").innerText();
+    };
+    await setup.selectOption("#provider", anthropic ? "anthropic" : "custom");
+    await setup.fill("#base-url", `http://127.0.0.1:${fake.port}/v1`);
+    await setup.fill("#model", "fake-vision-1");
+    await setup.fill("#key", "wrong-key");
+    await setup.click("#key-save");
+    step(`provider ${process.env.PROVIDER}, wrong key: "${await settle()}"`);
+    await setup.fill("#key", FAKE_KEY);
+    await setup.click("#list-models");
+    step(`listed: "${await settle()}" (${await setup.locator("#models option").count()} in the picker)`);
+    await setup.fill("#model", process.env.PROVIDER === "reasoning" ? "fake-reasoning" : "fake-vision-1");
+    await setup.fill("#sim-model", "fake-sim-2");
+    await setup.click("#key-save");
+    step(`saved: "${await settle()}" · "${await setup.locator("#key-saved-what").innerText()}"`);
+    await setup.waitForTimeout(600);
+    step(`connection: "${await setup.locator("#server").textContent()}"`);
+    await setup.close();
+  }
+
   const page = ctx.pages()[0] ?? (await ctx.newPage());
+  if (fake) await page.bringToFront(); // a tab behind another one paints no video frames
   if (process.env.TRACE_PLAY) {
     // Who starts the video? Logs every play() in the page's own world, with where it came from.
     await page.addInitScript(() => {
@@ -892,6 +924,12 @@ try {
 
   const log = (await sw.evaluate(() => chrome.storage.local.get("log").then((r) => r.log ?? []))) as any[];
   step(`Offer log: ${log.length} entries → ${log.map((e: any) => `${e.source}/${e.type} offer=${e.offerOutcome ?? "-"} expl=${e.explanationOutcome ?? "-"} q=${e.question ? "yes" : "no"}`).join(" | ")}`);
+  if (fake) {
+    const by = new Map<string, number>();
+    for (const c of fake.calls) by.set(`${c.kind} ${c.model}${c.stream ? " (streamed)" : ""}${c.image ? " +frame" : ""}`, (by.get(`${c.kind} ${c.model}${c.stream ? " (streamed)" : ""}${c.image ? " +frame" : ""}`) ?? 0) + 1);
+    step(`the fake provider got ${fake.calls.length} calls (${fake.calls[0]?.api}):\n    ${[...by].map(([k, n]) => `${n}× ${k}`).join("\n    ")}`);
+    await fake.close();
+  }
 } finally {
   if (errors.length) console.log(`\nConsole errors/warnings:\n  ${[...new Set(errors)].slice(0, 15).join("\n  ")}`);
   await ctx.close();

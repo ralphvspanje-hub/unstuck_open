@@ -12,7 +12,18 @@
   "host_permissions": [
     "https://www.youtube.com/*",
     "https://generativelanguage.googleapis.com/*",
-    "http://127.0.0.1:4717/*"
+    "http://127.0.0.1:4717/*",
+    "https://api.openai.com/*",
+    "https://api.anthropic.com/*",
+    "https://api.mistral.ai/*",
+    "https://api.x.ai/*",
+    "https://openrouter.ai/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://*/*"
   ],
   "background": {
     "service_worker": "background.js",

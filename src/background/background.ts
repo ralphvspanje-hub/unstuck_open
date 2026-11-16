@@ -1,8 +1,10 @@
 // Background worker: the only part that talks to the models, and the owner of the camera's offscreen
-// page (ADR 0001). With the Viewer's own Gemini key saved (setup page), it calls Gemini directly;
-// without one, it goes through the local server (the development setup, and the mock for tests).
-import type { GoogleGenAI } from "@google/genai";
+// page (ADR 0001). With the Viewer's own key saved (setup page), it calls their provider directly:
+// Gemini by default, or another one (ADR 0009). Without one, it goes through the local server
+// (the development setup, and the mock for tests).
 import * as gemini from "../ai/gemini.ts";
+import * as chat from "../ai/chat.ts";
+import { call as providerCall, nameOf, presetOf, providerOf, stream as providerStream, type ChatSettings, type Provider, type ProviderSettings } from "../ai/provider.ts";
 import { clearKey, hasKey, loadKey, saveKey } from "./keystore.ts";
 
 declare const __UNSTUCK_PORT__: string; // set by scripts/build.ts: 4717, or another port for a test build
@@ -12,48 +14,36 @@ const NOT_SET_UP = "Unstuck isn't set up yet: click the Unstuck icon and add you
 
 // ── direct mode: the Viewer's own key ──────────────────────────────────
 
-let client: { key: string; ai: GoogleGenAI } | null = null;
+let client: { stamp: string; p: Provider } | null = null;
 
-async function directAi(): Promise<GoogleGenAI | null> {
-  const key = await loadKey();
-  if (!key) return (client = null);
-  if (client?.key !== key) client = { key, ai: gemini.createClient(key)! };
-  return client.ai;
+const settingsOf = async () => ((await chrome.storage.local.get("provider")).provider as ProviderSettings | undefined) ?? { preset: "gemini" as const };
+
+/** The Viewer's provider, with their key, or null when nothing is set up (then: the local server). */
+async function directAi(): Promise<Provider | null> {
+  const [s, key] = await Promise.all([settingsOf(), loadKey()]);
+  const stamp = JSON.stringify(s) + (key ?? "");
+  if (client?.stamp === stamp) return client.p;
+  const p = providerOf(s, key);
+  client = p ? { stamp, p } : null;
+  return p;
 }
 
 /** What went wrong, in words a Viewer can act on. */
-function friendly(e: unknown): string {
+function friendly(e: unknown, name = "Gemini"): string {
   const m = String((e as any)?.message ?? e);
-  if (/API key not valid|API_KEY_INVALID|PERMISSION_DENIED|\b40[13]\b/i.test(m)) return "Your Gemini key doesn't work. Click the Unstuck icon to check it.";
-  if (/\b429\b|quota|RESOURCE_EXHAUSTED/i.test(m)) return "Gemini's free limit for today is used up. It resets tomorrow morning.";
-  if (/Failed to fetch|NetworkError|network/i.test(m)) return "No connection to Gemini. Check your internet.";
+  if (/API key not valid|API_KEY_INVALID|PERMISSION_DENIED|invalid.{0,20}key|authentication|\b40[13]\b/i.test(m)) return name === "API" ? "That API doesn't take this key. Click the Unstuck icon to check it." : `Your ${name} key doesn't work. Click the Unstuck icon to check it.`;
+  if (/\b429\b|quota|RESOURCE_EXHAUSTED|rate limit/i.test(m))
+    return name === "Gemini" ? "Gemini's free limit for today is used up. It resets tomorrow morning." : `${name} says the limit is used up for now (429). Try again later.`;
+  if (/Failed to fetch|NetworkError|network/i.test(m)) return `No connection to ${name === "API" ? "that API" : name}. Check the address and your internet${/Ollama|LM Studio/.test(name) ? `, and that ${name} is running` : ""}.`;
   return m.slice(0, 200);
 }
 
-async function direct(ai: GoogleGenAI, path: string, body: any): Promise<unknown> {
-  switch (path) {
-    case "/health":
-      return { ok: true, direct: true };
-    case "/judge":
-      return gemini.judge(ai, body);
-    case "/map":
-      return gemini.videoMap(ai, body);
-    case "/locate":
-      return gemini.locate(ai, body);
-    case "/figure":
-      return gemini.figure(ai, body);
-    case "/figure-check":
-      return gemini.checkFigure(ai, body);
+async function direct(p: Provider, path: string, body: any): Promise<unknown> {
+  if (path === "/health") {
+    const custom = p.kind === "chat" && p.name === "API";
+    return { ok: true, direct: true, provider: custom ? new URL(p.cfg.baseUrl).host : nameOf(p), model: p.kind === "chat" ? p.cfg.model : undefined };
   }
-  throw new Error(`unknown call ${path}`);
-}
-
-/** Streamed answers in direct mode. (The server also checks HTML figures on a render; this doesn't.) */
-function directStream(ai: GoogleGenAI, path: string, body: any, signal: AbortSignal): AsyncIterable<string> {
-  if (path === "/explain") return gemini.explain(ai, body, signal);
-  if (path === "/recap") return gemini.recap(ai, body, signal);
-  if (path === "/sim") return gemini.sim(ai, body, signal);
-  throw new Error(`unknown stream ${path}`);
+  return providerCall(p, path, body);
 }
 
 /** A key is tried before it is kept: a quick look-up of a model, no answer generated. */
@@ -72,13 +62,31 @@ let cameraTab: number | null = null;
 let cameraView: number | null = null;
 chrome.windows.onRemoved.addListener((id) => id === cameraView && (cameraView = null));
 
+/** Another provider: the settings from the setup page, tried with one tiny answer before they are kept. */
+async function saveProvider(s: ChatSettings, key: string): Promise<string | null> {
+  const name = presetOf(s.preset).short;
+  if (!s.baseUrl.trim()) return "Fill in the API address.";
+  if (!s.model.trim()) return "Pick a model.";
+  if (!key && !s.local) return `Paste your ${name} key.`;
+  try {
+    await chat.tryModel({ api: s.api, baseUrl: s.baseUrl, key: key || undefined, model: s.model });
+  } catch (e) {
+    return friendly(e, name);
+  }
+  if (key) await saveKey(key);
+  else await clearKey();
+  await chrome.storage.local.set({ provider: s });
+  client = null;
+  return null;
+}
+
 async function call(path: string, body?: unknown) {
-  const ai = await directAi();
-  if (ai) {
+  const p = await directAi();
+  if (p) {
     try {
-      return { ok: true, data: await direct(ai, path, body) };
+      return { ok: true, data: await direct(p, path, body) };
     } catch (e) {
-      return { ok: false, error: friendly(e) };
+      return { ok: false, error: friendly(e, nameOf(p)) };
     }
   }
   try {
@@ -133,15 +141,27 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       void (async () => {
         const key = String(msg.key ?? "").trim();
         const problem = await tryKey(key);
-        if (!problem) await saveKey(key);
+        if (!problem) {
+          await saveKey(key);
+          await chrome.storage.local.set({ provider: { preset: "gemini" } });
+          client = null;
+        }
         reply(problem ? { ok: false, error: problem } : { ok: true });
       })();
       return true;
     case "key-status":
-      hasKey().then((saved) => reply({ saved }));
+      void Promise.all([hasKey(), settingsOf()]).then(([saved, s]) => reply({ saved: saved || ("local" in s && Boolean(s.local)), settings: s }));
       return true;
     case "key-clear":
-      clearKey().then(() => ((client = null), reply({ ok: true })));
+      void Promise.all([clearKey(), chrome.storage.local.remove("provider")]).then(() => ((client = null), reply({ ok: true })));
+      return true;
+    case "provider-models":
+      chat
+        .listModels({ api: msg.api, baseUrl: String(msg.baseUrl ?? ""), key: String(msg.key ?? "").trim() || undefined })
+        .then((models) => reply({ ok: true, models }), (e) => reply({ ok: false, error: friendly(e, presetOf(msg.preset).short) }));
+      return true;
+    case "provider-save":
+      saveProvider(msg.settings, String(msg.key ?? "").trim()).then((problem) => reply(problem ? { ok: false, error: problem } : { ok: true }));
       return true;
     case "camera-start":
       startCamera(sender.tab?.id).then(reply);
@@ -200,15 +220,15 @@ chrome.runtime.onConnect.addListener((port) => {
   port.onMessage.addListener(async (msg) => {
     if (!msg?.path) return; // a keep-alive ping from the tab while a long answer is on its way
     const { path, body } = msg;
-    const ai = await directAi();
-    if (ai) {
+    const p = await directAi();
+    if (p) {
       try {
-        for await (const piece of directStream(ai, path, body, ctrl.signal)) port.postMessage({ delta: piece });
+        for await (const piece of providerStream(p, path, body, ctrl.signal)) port.postMessage({ delta: piece });
         port.postMessage({ done: true });
       } catch (e) {
         if (!ctrl.signal.aborted) {
           try {
-            port.postMessage({ error: friendly(e) });
+            port.postMessage({ error: friendly(e, nameOf(p)) });
           } catch {}
         }
       }

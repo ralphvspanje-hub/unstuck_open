@@ -16,4 +16,4 @@ Use the terms in `GLOSSARY.md` (Viewer, Session, Stuck moment, Missed moment, St
 
 ## Secrets
 
-A Viewer's own key (ADR 0007) is typed by that person into the setup page, kept encrypted by `src/background/keystore.ts`, and sent only to Google; never handle one yourself. The local server's key lives only in its environment. Never write a key to a file, log it or echo it, and never commit `.env*`.
+A Viewer's own key (ADR 0007) is typed by that person into the setup page, kept encrypted by `src/background/keystore.ts`, and sent only to their provider (ADR 0009); never handle one yourself. The local server's key lives only in its environment. Never write a key to a file, log it or echo it, and never commit `.env*`.

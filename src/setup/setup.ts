@@ -1,8 +1,9 @@
 // Setup page (click the Unstuck icon in Chrome's toolbar): three short steps for a new Viewer (their
-// own Gemini key, the camera, how to use it), and a closed "For testing" part (settings, the face
+// own key, Gemini or another provider; the camera; how to use it), and a closed "For testing" part (settings, the face
 // meter keys, the connection, the three v1 checks from the Offer log). The camera is granted to the
 // extension itself, never to youtube.com or Panopto (ADR 0001).
 import type { LogEntry } from "../core/types.ts";
+import { PRESETS, originPattern, presetOf } from "../ai/presets.ts";
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
 
@@ -40,47 +41,136 @@ async function showCamera(granted: boolean) {
   note();
 }
 
-// ── the Viewer's own Gemini key (kept locked by the background worker, src/background/keystore.ts) ──
+// ── the Viewer's own key (kept locked by the background worker, src/background/keystore.ts) ──
+// Gemini by default; another provider (ADR 0009) adds an API address and a model.
+
+const preset = () => presetOf($<HTMLSelectElement>("#provider").value);
+
+function showPreset() {
+  const p = preset();
+  const gem = p.api === "gemini";
+  $("#gemini-how").classList.toggle("hidden", !gem);
+  $("#other-how").classList.toggle("hidden", gem);
+  $("#provider-note").textContent = p.note ?? "";
+  const base = $<HTMLInputElement>("#base-url");
+  base.value = p.baseUrl; // editable: a proxy or another region has its own address
+  $<HTMLInputElement>("#key").placeholder = p.local ? "No key needed (paste one if your server wants it)" : `Paste your ${p.id === "custom" ? "" : `${p.short} `}key`;
+  const where = $("#key-where");
+  where.textContent = "";
+  if (p.keyUrl) {
+    where.append("Get a key at ");
+    where.append(Object.assign(document.createElement("a"), { href: p.keyUrl, target: "_blank", rel: "noopener", textContent: new URL(p.keyUrl).host }));
+    where.append(", then fill in the model and paste the key.");
+  } else where.textContent = p.local ? "Start it, load a model, and pick that model here." : "Fill in the API address, the model and the key.";
+  $("#models").textContent = "";
+}
 
 async function showKey() {
-  const { saved } = await chrome.runtime.sendMessage({ kind: "key-status" });
+  const { saved, settings: s } = await chrome.runtime.sendMessage({ kind: "key-status" });
   $("#key-new").classList.toggle("hidden", saved);
   $("#key-saved").classList.toggle("hidden", !saved);
   $("#step-key").classList.toggle("done", saved);
+  const p = presetOf(s?.preset);
+  let host = "Google";
+  try {
+    host = p.api === "gemini" ? "Google" : new URL(s?.baseUrl || p.baseUrl).host;
+  } catch {}
+  $("#key-saved-what").textContent = p.api === "gemini" ? "Gemini key saved ✓" : p.id === "custom" ? `${s.model} at ${host} ✓` : `${p.short}, ${s.model} ✓`;
+  $("#key-privacy").textContent =
+    p.api === "gemini" && (saved || preset().api === "gemini")
+      ? "The key stays in this browser, locked, and only goes to Google. On the free plan Google may use what Unstuck sends (a picture of the video and its sound, never your face) to improve its products."
+      : `The key stays in this browser, locked, and only goes to ${saved ? host : "the provider"}. What Unstuck sends (a picture of the video and its transcript, never your face) falls under that provider's terms.`;
 }
 
-async function saveKey() {
+/** Chrome must allow the provider's address; asked for inside the click, as Chrome requires. */
+function allowHost(baseUrl: string): Promise<boolean> {
+  const origin = originPattern(baseUrl);
+  return origin ? chrome.permissions.request({ origins: [origin] }).catch(() => false) : Promise.resolve(false);
+}
+
+function other() {
+  const p = preset();
+  return {
+    preset: p.id,
+    api: p.api as "openai" | "anthropic",
+    baseUrl: $<HTMLInputElement>("#base-url").value.trim(),
+    model: $<HTMLInputElement>("#model").value.trim(),
+    simModel: $<HTMLInputElement>("#sim-model").value.trim() || undefined,
+    local: p.local,
+  };
+}
+
+function listModels() {
+  const s = other();
+  const status = $("#key-status");
+  const allowed = allowHost(s.baseUrl);
+  void (async () => {
+    if (!(await allowed)) {
+      status.textContent = s.baseUrl ? "Unstuck needs your permission to reach that address." : "Fill in the API address first.";
+      status.className = "small bad";
+      return;
+    }
+    status.textContent = "Asking for the models…";
+    status.className = "small";
+    const res = await chrome.runtime.sendMessage({ kind: "provider-models", ...s, key: $<HTMLInputElement>("#key").value });
+    if (!res?.ok) {
+      status.textContent = res?.error ?? "That didn't work.";
+      status.className = "small bad";
+      return;
+    }
+    const list = $("#models");
+    list.textContent = "";
+    for (const m of res.models) list.append(Object.assign(document.createElement("option"), { value: m }));
+    status.textContent = `${res.models.length} models: click the Model field to pick one.`;
+    status.className = "small ok";
+  })();
+}
+
+function saveKey() {
   const input = $<HTMLInputElement>("#key");
   const status = $("#key-status");
   const button = $<HTMLButtonElement>("#key-save");
-  if (!input.value.trim()) return;
-  button.disabled = true;
-  status.textContent = "Checking the key with Google…";
-  status.className = "small";
-  const res = await chrome.runtime.sendMessage({ kind: "key-save", key: input.value });
-  button.disabled = false;
-  if (res?.ok) {
-    input.value = "";
-    status.textContent = "It works ✓ You're ready: open a lecture or a video.";
-    status.className = "small ok";
-  } else {
-    status.textContent = res?.error ?? "That didn't work. Try again.";
-    status.className = "small bad";
-  }
-  await Promise.all([showKey(), checkServer()]);
+  const gem = preset().api === "gemini";
+  if (gem && !input.value.trim()) return;
+  const s = gem ? null : other();
+  const allowed = s ? allowHost(s.baseUrl) : Promise.resolve(true);
+  void (async () => {
+    button.disabled = true;
+    status.className = "small";
+    let res: any;
+    if (!s) {
+      status.textContent = "Checking the key with Google…";
+      res = await chrome.runtime.sendMessage({ kind: "key-save", key: input.value });
+    } else if (!(await allowed)) {
+      res = { ok: false, error: s.baseUrl ? "Unstuck needs your permission to reach that address." : "Fill in the API address." };
+    } else {
+      status.textContent = `Trying ${s.model || "the model"}…`;
+      res = await chrome.runtime.sendMessage({ kind: "provider-save", settings: s, key: input.value });
+    }
+    button.disabled = false;
+    if (res?.ok) {
+      input.value = "";
+      status.textContent = "It works ✓ You're ready: open a lecture or a video.";
+      status.className = "small ok";
+    } else {
+      status.textContent = res?.error ?? "That didn't work. Try again.";
+      status.className = "small bad";
+    }
+    await Promise.all([showKey(), checkServer()]);
+  })();
 }
 
 async function checkServer() {
   const el = $("#server");
   const res = await chrome.runtime.sendMessage({ kind: "api", path: "/health" });
   if (res?.ok && res.data.direct) {
-    el.textContent = "Straight to Gemini, with your key ✓";
+    el.textContent = `Straight to ${res.data.provider ?? "Gemini"}${res.data.model ? ` (${res.data.model})` : ""}, with your key ✓`;
     el.className = "ok";
   } else if (res?.ok) {
     el.textContent = res.data.mock ? "Local server in mock mode (no Gemini key): canned answers." : `Local server, with ${res.data.flash} and ${res.data.decision} ✓`;
     el.className = res.data.mock ? "warn" : "ok";
   } else {
-    el.textContent = "Not connected: add a Gemini key above (or start the local server with a key: see the README).";
+    el.textContent = "Not connected: add a key above (or start the local server with a key: see the README).";
     el.className = "bad";
   }
 }
@@ -116,8 +206,20 @@ async function bind(id: string, key: "camera" | "room" | "thinkFirst", fallback 
 async function init() {
   await Promise.all([bind("camera", "camera"), bind("room", "room"), bind("thinkFirst", "thinkFirst", false), showKey()]);
   $("#grant").onclick = () => void grantCamera();
-  $("#key-save").onclick = () => void saveKey();
-  $<HTMLInputElement>("#key").onkeydown = (e) => e.key === "Enter" && void saveKey();
+  const select = $<HTMLSelectElement>("#provider");
+  for (const p of PRESETS) select.append(Object.assign(document.createElement("option"), { value: p.id, textContent: p.name }));
+  const { provider: saved } = (await chrome.storage.local.get("provider")) as { provider?: { preset: string; baseUrl?: string; model?: string; simModel?: string } };
+  select.value = presetOf(saved?.preset).id;
+  showPreset();
+  if (saved && saved.preset !== "gemini") {
+    $<HTMLInputElement>("#base-url").value = saved.baseUrl ?? "";
+    $<HTMLInputElement>("#model").value = saved.model ?? "";
+    $<HTMLInputElement>("#sim-model").value = saved.simModel ?? "";
+  }
+  select.onchange = () => (showPreset(), void showKey());
+  $("#list-models").onclick = () => listModels();
+  $("#key-save").onclick = () => saveKey();
+  $<HTMLInputElement>("#key").onkeydown = (e) => e.key === "Enter" && saveKey();
   $("#key-remove").onclick = async () => {
     await chrome.runtime.sendMessage({ kind: "key-clear" });
     $("#key-status").textContent = "";

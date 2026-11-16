@@ -247,7 +247,7 @@ export const sim = (ai: GoogleGenAI, r: SimRequest, signal: AbortSignal) =>
     prefer: VISUAL,
   });
 
-const pickFigure = (text: string, format: "svg" | "html") => {
+export const pickFigure = (text: string, format: "svg" | "html") => {
   const t = text.replace(/^\s*```(?:svg|html|xml)?\s*/i, "").replace(/```\s*$/, "").trim();
   if (format === "svg") {
     const a = t.indexOf("<svg");

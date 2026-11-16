@@ -36,6 +36,13 @@ this file is how to get it running for them, and what to check when it doesn't.
    Either way: [aistudio.google.com/apikey](https://aistudio.google.com/apikey) → **Create API key** → copy → paste on
    Unstuck's setup page → **Save**. The page tries the key once and shows "Key saved ✓". As of November 2026 every
    model Unstuck uses has a free tier.
+
+   **Another provider** (if they already have a key, or want a local model): on the setup page they pick it under
+   **Model provider** (OpenAI, Anthropic, Mistral, xAI, OpenRouter, Ollama, LM Studio, or any OpenAI-compatible API
+   by its address), paste the key, click **List models**, pick a model (a vision model, so Marks work) and **Save**.
+   Chrome asks once to allow an address it doesn't know. Tell them what they give up: the judge is a prompt instead
+   of Gemini Decision 1, a lecture's sound isn't sent, and only Gemini has a free tier (ADR 0009). For Ollama, the
+   model must be pulled first (`ollama pull <model>`), and Ollama may need `OLLAMA_ORIGINS=chrome-extension://*`.
 5. **The camera (optional):** **Allow camera** on the setup page. Chrome asks there, on the extension's own page,
    never on YouTube.
 6. **First run:** a YouTube explainer → play → click the 🪢 knot in the player's control bar if it isn't on → press
@@ -45,12 +52,17 @@ After any code change: `npm run build`, the round arrow on Unstuck in `chrome://
 
 ## Choosing models, or another provider
 
-- The four model names are constants at the top of `src/ai/gemini.ts`: `FLASH` (answers), `FLASH_FALLBACK` (when
+- Other providers and their models are picked on the setup page; nothing to change in code. A provider that isn't
+  listed but speaks OpenAI's chat-completions format works as "Another OpenAI-compatible API" with its address.
+- The Gemini models are constants at the top of `src/ai/gemini.ts`: `FLASH` (answers), `FLASH_FALLBACK` (when
   Flash is busy or out of quota), `DECISION` (the judge, `gemini-decision-1`) and `VISUAL` (simulations; `""` turns
   it off so the usual models build them). Change, rebuild, reload.
-- Every model call is in `src/ai/gemini.ts`, and the prompts are in `src/ai/prompts.ts`. Another provider means
-  rewriting `gemini.ts` behind the same functions. The judge needs a model that returns a score from 0 to 1 for
-  "would a short explanation help right now?"; the threshold is `RULES.offerAt` in `src/core/rules.ts`.
+- The code: prompts in `src/ai/prompts.ts`, Gemini in `src/ai/gemini.ts`, the OpenAI-compatible and Anthropic
+  formats in `src/ai/chat.ts`, the switch in `src/ai/provider.ts`, the setup page's list in `src/ai/presets.ts`.
+  A provider with yet another format would be one more adapter in `chat.ts`. The Offer threshold is
+  `RULES.offerAt` in `src/core/rules.ts`.
+- Test a provider change without any key: `PROVIDER=openai npm run smoke` (or `anthropic`, `reasoning`) sets it up
+  on the setup page against a fake provider (`scripts/fake-provider.ts`) and runs the whole loop through it.
 
 ## Optional: the local server
 
@@ -79,7 +91,10 @@ Or from a secrets manager, e.g. `op run --env-file=.env -- npm run dev` with `.e
 | What they see | Why, and what to do |
 |---|---|
 | Setup page says "Not connected" | No key saved and no server running. Save a key on the setup page. |
-| The key isn't accepted | A typo, or a key from a project without the Gemini API. Create a new one in AI Studio. |
+| The key isn't accepted | A typo, or a key from a project without the Gemini API. Create a new one in AI Studio. For another provider: the key, the address, or a model name the key can't use; **List models** shows what it can. |
+| Another provider: "needs your permission to reach that address" | Chrome's prompt was dismissed. Click **Save** again and allow it. |
+| Ollama or LM Studio: "No connection" | It isn't running, the address is wrong, or Ollama refuses the extension: start it with `OLLAMA_ORIGINS=chrome-extension://*`. |
+| Another provider: no arrows or circles | The model can't see images or doesn't give usable boxes. Pick a vision model. |
 | Answers stop, errors mention 429 or quota | The day's free quota is used up. Wait until the next day (it resets at midnight Pacific) or turn on billing. |
 | First words take long, or "busy" | The model is under load; Unstuck falls back to Flash-Lite by itself. |
 | No Offers pop up | Normal at first: an Offer needs the video playing, the judge scoring ≥ 0.7, and 2 minutes since the last one. Press **D** for the face meter, which also lists what a real Offer still needs. **E** always asks directly. For many more Offers, use the frequent-mode values in the comments in `src/core/rules.ts`. |

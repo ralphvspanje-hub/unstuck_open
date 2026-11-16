@@ -9,7 +9,7 @@ Unstuck helps the moment you get stuck in a recorded lecture or a YouTube explai
 3. Switch on **Developer mode** (top right).
 4. Click **Load unpacked** and choose that folder.
 5. Unstuck's setup page opens. Follow its three steps:
-   - **Your Gemini key:** free, from Google AI Studio (the page shows how). Paste it and click Save.
+   - **Your Gemini key:** free, from Google AI Studio (the page shows how). Paste it and click Save. (Another provider's key works too: pick it in the list first.)
    - **The camera** (optional): lets Unstuck notice when you look confused. Your face stays on your laptop.
 6. Pin it: click the puzzle piece next to the address bar, then the pin next to **Unstuck**.
 
