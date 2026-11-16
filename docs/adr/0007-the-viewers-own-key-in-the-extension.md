@@ -1,0 +1,7 @@
+# The Viewer's own Gemini key lives in the extension, encrypted
+
+Unstuck first ran its model calls on a local server that held the author's key, which only works on the author's laptop. For someone else to use it (a friend watching their lectures, Nov 2026), there were three routes: host the server online with the author's key, have them run the server themselves (Node, a terminal, their own key), or let the extension call Gemini directly with a key of their own. We chose the last: it needs no server and no terminal, each Viewer's lectures go through their own Google account and quota, and it is how any later Viewer would use it.
+
+The model code moved to `src/ai/` and is shared: the server still uses it with the key from its environment (the development setup, and the mock for tests), and the background worker uses it with the Viewer's key. With a key saved, the worker calls Gemini; without one, it calls the server. The key is typed into the setup page, tried with a model look-up first, then encrypted with AES-GCM under a key generated in that browser profile that cannot be exported (kept in IndexedDB); only the encrypted form goes into `chrome.storage`. It is decrypted in memory for a call, sent only to Google's API host, and never logged.
+
+What the direct route gives up: the server's check of HTML figures on a render (there is no headless browser in the extension), so in direct mode figures go out as the model drew them.

@@ -1,0 +1,82 @@
+{
+  "manifest_version": 3,
+  "name": "Unstuck",
+  "version": "0.1.0",
+  "description": "Notices when you are stuck in a YouTube video and offers a visual explanation before you ask.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA8rlpYV8vt3S9YiIB2+1Jqr8Whmn4YuPZKTXBAPXBlDyj4sRxwu9ESKWOwL20HrRhscJD4llnn35WvB1mgtCdze83VaLVVRbZariJV7KWeYIFuhz9zfEPgw+uf+QV/MHndm1fW+GQpuvYN0ZuS/ygvlWMqTQMCM9gTgdYE9cqh4ONbpslvV4IuU6dXabjfCnnhOKGmv0fLwzasAb64VZEV427anx8/83o3ntnQPPIHgCbXYDSsF5d91Edww0RiecyQfmVFgxxEbm4Osp2BzLeoxu4wLfV0kMpwJd+zK2iPLsk/S+XvLz7IGjD8URnrcpDEROCxoe1a9qeel8F2uMjAwIDAQAB",
+  "minimum_chrome_version": "116",
+  "permissions": [
+    "storage",
+    "offscreen"
+  ],
+  "host_permissions": [
+    "https://www.youtube.com/*",
+    "https://generativelanguage.googleapis.com/*",
+    "http://127.0.0.1:4717/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Unstuck: setup and stats"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.youtube.com/*"
+      ],
+      "js": [
+        "page.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://www.youtube.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.panopto.com/Panopto/Pages/*",
+        "https://*.panopto.eu/Panopto/Pages/*"
+      ],
+      "js": [
+        "panopto.js"
+      ],
+      "all_frames": true,
+      "run_at": "document_idle"
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'",
+    "sandbox": "sandbox allow-scripts; default-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; worker-src blob:; connect-src 'none'"
+  },
+  "sandbox": {
+    "pages": [
+      "sim.html"
+    ]
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "sim.html",
+        "sim.js",
+        "three.js"
+      ],
+      "matches": [
+        "https://www.youtube.com/*",
+        "https://*.panopto.com/*",
+        "https://*.panopto.eu/*"
+      ]
+    }
+  ]
+}

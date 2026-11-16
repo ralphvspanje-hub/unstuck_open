@@ -1,0 +1,7 @@
+# Lectures send their last minutes of sound with an Explanation
+
+On YouTube, Unstuck follows the video through its captions. Lectures are different: they are slow, one idea is built up over minutes, and their host's captions are often missing (Panopto adds automatic ones only when the university switched that on) or poor with names and jargon. So on a lecture, Unstuck keeps the last 5 minutes of the video's sound and sends it with each Explanation and Recap; Gemini listens to it, and the prompt says to trust the sound over the transcript when they disagree.
+
+The sound is recorded from the video element itself (`captureStream`), never from the microphone, only while the video plays, in one-minute pieces (each a file of its own), and kept in memory only. Chrome can only record WebM (Opus); Gemini's docs don't list it, but a test on 16 Nov 2026 showed `audio/webm` is accepted and understood. A minute is about 250 KB, so 5 minutes is about 1.3 MB per request.
+
+The alternatives were one minute (too short for a lecture, as the first Viewer put it, "they keep on one topic for very long"), transcribing everything in the background as it plays (a call every minute, the whole lecture sent), or Panopto's captions only. Sending the sound only at the moments that need it keeps calls and data down. Like the frames of the video, it can contain other people's voices (questions from the room); it never contains the Viewer's face (ADR 0002).

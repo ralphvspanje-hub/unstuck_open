@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Unstuck</title>
+  <style>
+    body { font: 15px/1.5 system-ui, sans-serif; background: #111317; color: #f4f4f5; max-width: 640px; margin: 48px auto; padding: 0 20px; }
+    h1 { display: flex; align-items: center; gap: 12px; font-size: 26px; }
+    h1 svg { width: 36px; height: 36px; }
+    h1 path { fill: none; stroke: #ff7a59; stroke-width: 3.2; stroke-linecap: round; }
+    section { background: #1a1d23; border-radius: 16px; padding: 18px 20px; margin: 16px 0; }
+    h2 { font-size: 15px; margin: 0 0 8px; opacity: .8; text-transform: uppercase; letter-spacing: .04em; }
+    button { font: inherit; font-weight: 600; background: #ff7a59; color: #1b0f0b; border: 0; border-radius: 999px; padding: 8px 16px; cursor: pointer; }
+    button.ghost { background: rgba(255,255,255,.1); color: inherit; }
+    .ok { color: #8be0a4; } .warn { color: #ffd27a; } .bad { color: #ffb4a3; }
+    ul { padding-left: 18px; margin: 0; } li { margin: 4px 0; }
+    label { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+    input { accent-color: #ff7a59; }
+    p.small { opacity: .7; font-size: 13.5px; }
+    .keys { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; align-items: center; }
+    kbd { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 7px; font: 600 13px system-ui;
+      background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); border-bottom-width: 3px; }
+    .lead { opacity: .8; margin-top: -6px; }
+    .step { display: grid; grid-template-columns: 34px 1fr; gap: 4px 12px; }
+    .num { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: rgba(255,122,89,.18); color: #ff7a59; }
+    .step.done .num { background: rgba(139,224,164,.18); color: #8be0a4; }
+    .step h3 { margin: 2px 0 4px; font-size: 16px; }
+    .step p { margin: 4px 0; }
+    ol.how { margin: 6px 0; padding-left: 20px; } ol.how li { margin: 3px 0; }
+    .keyrow { display: flex; gap: 8px; margin-top: 8px; }
+    .keyrow input { flex: 1; font: inherit; padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.18); background: #111317; color: inherit; }
+    a { color: #ffb29c; }
+    details { margin: 24px 0; } summary { cursor: pointer; opacity: .6; }
+    details[open] summary { margin-bottom: 8px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <h1><svg viewBox="0 0 32 32"><path d="M3 17 C 9 1, 23 1, 19 14 C 15 27, 3 21, 10 12 C 17 3, 29 8, 29 17"/></svg> Unstuck</h1>
+  <p class="lead">Help the moment you get stuck in a video: a recorded lecture or a YouTube explainer.</p>
+
+  <section class="step" id="step-key">
+    <div class="num">1</div>
+    <div>
+      <h3>Add your free Gemini key</h3>
+      <div id="key-new">
+        <p>Unstuck uses Google's Gemini to explain things. A key is free and takes a minute:</p>
+        <ol class="how">
+          <li>Open <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a> and sign in with a Google account.</li>
+          <li>Click <b>Create API key</b>, then copy the key.</li>
+          <li>Paste it here:</li>
+        </ol>
+        <div class="keyrow"><input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your key"><button id="key-save">Save</button></div>
+      </div>
+      <div id="key-saved" class="hidden"><p class="ok">Key saved ✓</p><button class="ghost" id="key-remove">Remove the key</button></div>
+      <p id="key-status" class="small"></p>
+      <p class="small">The key stays in this browser, locked, and only goes to Google. On the free plan Google may use what Unstuck sends (a picture of the video and its sound, never your face) to improve its products.</p>
+    </div>
+  </section>
+
+  <section class="step" id="step-camera">
+    <div class="num">2</div>
+    <div>
+      <h3>The camera <span class="small">(optional)</span></h3>
+      <p>Then Unstuck notices when you look confused. Your face is read on this laptop only: no picture of it goes anywhere.</p>
+      <div id="cam-new"><button id="grant">Allow camera</button></div>
+      <div id="cam-on" class="hidden">
+        <label><input type="checkbox" id="camera"> Use the camera</label>
+        <p class="small" id="cam-off-note">Off: Unstuck then goes by how you use the video (rewinding, pausing).</p>
+      </div>
+      <div id="cam-status" class="small"></div>
+    </div>
+  </section>
+
+  <section class="step">
+    <div class="num">3</div>
+    <div>
+      <h3>Watch</h3>
+      <p>Open a lecture on Panopto, or a video on YouTube and click the knot in the player. When you look stuck, a small note offers help.</p>
+      <div class="keys">
+        <kbd>E</kbd><span>Explain this (or take the note that's showing)</span>
+        <kbd>U</kbd><span>Switch Unstuck on or off</span>
+      </div>
+    </div>
+  </section>
+
+  <details>
+    <summary>For testing</summary>
+    <section>
+      <h2>Settings</h2>
+      <label><input type="checkbox" id="room"> On YouTube, move the video beside the chat</label>
+      <label><input type="checkbox" id="thinkFirst"> Let the first answer think first (shows how long the first word took)</label>
+    </section>
+    <section>
+      <h2>More keys</h2>
+      <div class="keys">
+        <kbd>Q</kbd><span>Explain what's on screen right now, even with a note showing</span>
+        <kbd>D</kbd><span>Face meter: shows when your face would set Unstuck off; drag the lines to tune. "Camera view ↗" opens a demo window.</span>
+        <kbd>Esc</kbd><span>Hide a "Play with it" simulation</span>
+      </div>
+      <p class="small">The camera films only while the video plays, plus 5 s after a pause. On a Mac, a glowing ring around the screen is macOS's Edge Light, not Unstuck: switch it off from the green camera icon in the menu bar.</p>
+    </section>
+    <section>
+      <h2>Connection</h2>
+      <div id="server">Checking…</div>
+    </section>
+    <section>
+      <h2>How it's doing</h2>
+      <ul id="stats"></ul>
+      <p class="small">Stored in this browser only.</p>
+      <button class="ghost" id="export">Export the Offer log</button>
+    </section>
+  </details>
+  <script type="module" src="setup.js"></script>
+</body>
+</html>

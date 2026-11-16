@@ -1,0 +1,5 @@
+# Simulations run in a manifest sandbox page
+
+"▶ Play with it" runs HTML and JavaScript that the model wrote moments ago, so it must not be able to touch YouTube, the extension or the internet. It runs in `sim.html`, an extension page declared under `"sandbox"` in the manifest: it has an opaque origin and no extension APIs, and its CSP allows inline scripts but no network of any kind (`connect-src 'none'`, `default-src 'none'`, images and fonts only as `data:` or `blob:`). The content script frames it with `sandbox="allow-scripts"`, sends the page over `postMessage`, and the sandbox page `document.write`s it. A guard script injected at the top of `<head>` reports "running", crashes and blank pages back, which lets the content script retry once with the error.
+
+We tried the simpler routes first, and both fail on YouTube. An `<iframe srcdoc>` and a `data:` URL both inherit youtube.com's CSP, which blocks inline scripts, and `srcdoc` is also a Trusted Types sink there. Running the code in an extension page that isn't sandboxed would give it extension APIs. The `document.write` on top of an opaque-origin page is deliberate, not a shortcut.

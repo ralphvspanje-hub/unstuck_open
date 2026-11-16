@@ -1,0 +1,45 @@
+/* Unstuck's buttons in YouTube's control bar, and hidden captions while Unstuck reads them (ADR 0003). */
+.unstuck-hide-cc .ytp-caption-window-container {
+  opacity: 0 !important;
+}
+.ytp-button.unstuck-toggle,
+.ytp-button.unstuck-ask {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  vertical-align: top;
+}
+.ytp-button.unstuck-toggle svg {
+  width: 26px;
+  height: 26px;
+  overflow: visible;
+}
+.ytp-button.unstuck-toggle path {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: stroke 0.2s, transform 0.3s;
+}
+.ytp-button.unstuck-toggle[data-state="on"] path {
+  stroke: #ff7a59;
+}
+.ytp-button.unstuck-toggle[data-state="disabled"] {
+  opacity: 0.35;
+}
+.ytp-button.unstuck-toggle:hover svg {
+  transform: rotate(-8deg) scale(1.08);
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.ytp-button.unstuck-ask {
+  font: 700 17px "YouTube Sans", Roboto, sans-serif;
+  color: #ff7a59;
+}
+.ytp-button.unstuck-ask[hidden] {
+  display: none !important;
+}
+.unstuck-reading-transcript ytd-engagement-panel-section-list-renderer {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

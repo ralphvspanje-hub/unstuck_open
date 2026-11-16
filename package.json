@@ -1,0 +1,38 @@
+{
+  "name": "unstuck",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MIT",
+  "repository": "github:ralphvspanje-hub/unstuck_open",
+  "type": "module",
+  "description": "A Chrome extension that notices when you're stuck in a YouTube video and offers a visual explanation before you ask.",
+  "scripts": {
+    "build": "node scripts/build.ts",
+    "watch": "node scripts/build.ts --watch",
+    "server": "node --watch server/index.ts",
+    "dev": "npm run build && npm run server",
+    "fetch-model": "node scripts/fetch-model.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "smoke": "node scripts/smoke.ts"
+  },
+  "engines": {
+    "node": ">=23.6"
+  },
+  "dependencies": {
+    "@google/genai": "^3.2.0",
+    "@mediapipe/tasks-vision": "^1.2.3",
+    "dompurify": "^3.4.17",
+    "katex": "^0.19.1",
+    "motion": "^14.13.0",
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.3.7",
+    "@types/katex": "^0.16.8",
+    "@types/node": "^26.6.6",
+    "esbuild": "^0.28.2",
+    "playwright": "^1.65.0",
+    "typescript": "^7.0.2"
+  }
+}

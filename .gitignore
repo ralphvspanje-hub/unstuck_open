@@ -1,0 +1,13 @@
+node_modules
+dist
+dist-test
+.DS_Store
+# Never commit env files, even reference files that only point at a secret.
+.env
+.env.*
+# Downloaded with npm run fetch-model
+extension/assets/face_landmarker.task
+# Offer log exports
+unstuck-log-*.json
+# Server log (timings and errors only)
+.logs/

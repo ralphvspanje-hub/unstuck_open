@@ -1,0 +1,5 @@
+# The Viewer's face never leaves the laptop
+
+Face tracking runs locally (MediaPipe Face Landmarker) and produces Face readings: numbers only. No image of the Viewer's face is stored or sent anywhere. Gemini Decision 1 receives a one-line text description of the Signals, never a webcam image. Sending webcam stills to Decision 1 would probably read the Viewer better, at roughly $0.10–0.30 per hour, but we chose privacy and a clean legal position: inferring states from faces is prohibited in EU workplaces and schools under AI Act Art. 5(1)(f), and any later product must not depend on it. The Offer log will show whether face signals add anything over Player actions at all.
+
+**The demo view (13 Nov 2026).** For showing Unstuck off, the face meter draws the face as a mesh of points (numbers, while the meter is open), and the camera view shows the camera picture with that mesh on it. The camera view is a window of Unstuck's own, so the picture never enters youtube.com's page. Neither is stored or sent anywhere, and Unstuck itself still works only from the numbers.
